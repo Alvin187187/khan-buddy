@@ -18,8 +18,7 @@ function SignupForm() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5">
-      <h1 className="text-3xl font-black">Create your account</h1>
-      <p className="mt-2 text-muted">Needed so teachers can see named insights — not nicknames.</p>
+      <h1 className="text-3xl font-black">Sign up</h1>
       <form
         className="mt-6 flex flex-col gap-4"
         onSubmit={async (e) => {
@@ -28,7 +27,7 @@ function SignupForm() {
           setError("");
           try {
             await rpc("signup", { name, email, password, role });
-            router.push("/class");
+            router.push("/home");
             router.refresh();
           } catch (err) {
             setError(err instanceof Error ? err.message : "Could not sign up");

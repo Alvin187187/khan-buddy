@@ -16,7 +16,6 @@ export default function LoginPage() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5">
       <h1 className="text-3xl font-black">Sign in</h1>
-      <p className="mt-2 text-muted">Teachers and students use the same door.</p>
       <form
         className="mt-6 flex flex-col gap-4"
         onSubmit={async (e) => {
@@ -25,7 +24,7 @@ export default function LoginPage() {
           setError("");
           try {
             await rpc("login", { email, password });
-            router.push("/class");
+            router.push("/home");
             router.refresh();
           } catch (err) {
             setError(err instanceof Error ? err.message : "Could not sign in");

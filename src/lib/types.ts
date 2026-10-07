@@ -1,15 +1,39 @@
 export type Role = "teacher" | "student";
-export type LabType = "function_machine" | "cell_builder";
+
+export type LabType =
+  | "function_machine"
+  | "cell_builder"
+  | "concept_sketch"
+  | "virus_defense"
+  | "ecosystem"
+  | "plant_survival"
+  | "immune_defense";
+
+export type Mechanic = "guess" | "battle" | "build" | "solve" | "simulate";
+
 export type RoomStatus = "lobby" | "playing" | "complete";
 
-export type User = {
+export type PublicUser = {
   id: string;
   role: Role;
   name: string;
-  email: string;
-  passwordHash: string;
+  email?: string;
   xp: number;
   streak: number;
+};
+
+export type ClassCard = {
+  id: string;
+  name: string;
+  code: string;
+  teacherId: string;
+  kaSetupComplete: boolean;
+  youAre: Role;
+};
+
+export type User = PublicUser & {
+  email: string;
+  passwordHash: string;
   lastActiveAt: string;
 };
 
@@ -22,24 +46,12 @@ export type Classroom = {
   createdAt: string;
 };
 
-export type Enrollment = {
-  classroomId: string;
-  studentId: string;
-  joinedAt: string;
-};
-
 export type Assignment = {
   id: string;
   classroomId: string;
   topicId: string;
   labType: LabType;
   createdAt: string;
-};
-
-export type KaOpen = {
-  assignmentId: string;
-  studentId: string;
-  openedAt: string;
 };
 
 export type Room = {
@@ -56,33 +68,22 @@ export type Room = {
   createdAt: string;
 };
 
-export type RoomPlayer = {
-  roomId: string;
-  userId: string;
-  roleKey: string;
-  joinedAt: string;
-};
-
-export type Attempt = {
-  id: string;
-  assignmentId: string;
-  roomId: string;
-  studentId: string;
-  passed: boolean;
-  conceptTag: string;
-  xpAwarded: number;
-  at: string;
-};
-
 export type Store = {
   users: User[];
   classrooms: Classroom[];
-  enrollments: Enrollment[];
+  enrollments: { classroomId: string; studentId: string; joinedAt: string }[];
   assignments: Assignment[];
-  kaOpens: KaOpen[];
+  kaOpens: { assignmentId: string; studentId: string; openedAt: string }[];
   rooms: Room[];
-  roomPlayers: RoomPlayer[];
-  attempts: Attempt[];
+  roomPlayers: { roomId: string; userId: string; roleKey: string; joinedAt: string }[];
+  attempts: {
+    id: string;
+    assignmentId: string;
+    roomId: string;
+    studentId: string;
+    passed: boolean;
+    conceptTag: string;
+    xpAwarded: number;
+    at: string;
+  }[];
 };
-
-export type PublicUser = Omit<User, "passwordHash">;

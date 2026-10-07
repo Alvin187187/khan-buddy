@@ -42,3 +42,5 @@ next-env.d.ts
 
 # local demo store
 /data/store.json
+
+.vercel

@@ -47,6 +47,11 @@ select {
   min-height: 44px;
 }
 
+input[type="range"] {
+  min-height: 28px;
+  accent-color: var(--primary);
+}
+
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
