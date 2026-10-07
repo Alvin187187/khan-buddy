@@ -12,8 +12,58 @@ function code(n = 6) {
   return s;
 }
 
-function throwIf(error: { message: string } | null) {
+function throwIf(error: { message: string; code?: string } | null) {
   if (error) throw new Error(error.message);
+}
+
+function pinOf(sim: unknown) {
+  const pin = (sim as { pin?: unknown } | null)?.pin;
+  return typeof pin === "string" ? pin : "";
+}
+
+function scoresOf(sim: unknown) {
+  const scores = (sim as { scores?: unknown } | null)?.scores;
+  return scores && typeof scores === "object" ? (scores as Record<string, number>) : {};
+}
+
+function missingTable(error: { message?: string; code?: string } | null) {
+  if (!error) return false;
+  return error.code === "PGRST205" || /could not find the table/i.test(error.message ?? "");
+}
+
+async function ensureStream(
+  supabase: ReturnType<typeof createClient>,
+  classroomId: string,
+  userId: string,
+) {
+  const { data: existing } = await supabase
+    .from("rooms")
+    .select("*")
+    .eq("classroom_id", classroomId)
+    .eq("lab_type", "stream")
+    .limit(1)
+    .maybeSingle();
+  if (existing) return existing as { id: string; sim: Record<string, unknown> };
+  const { data: assignment, error: aErr } = await supabase
+    .from("assignments")
+    .insert({ classroom_id: classroomId, topic_id: "stream", lab_type: "stream" })
+    .select()
+    .single();
+  throwIf(aErr);
+  const { data: room, error } = await supabase
+    .from("rooms")
+    .insert({
+      classroom_id: classroomId,
+      assignment_id: assignment.id,
+      lab_type: "stream",
+      host_id: userId,
+      status: "complete",
+      sim: { notes: [] },
+    })
+    .select()
+    .single();
+  throwIf(error);
+  return room as { id: string; sim: Record<string, unknown> };
 }
 
 function mapClass(row: {
@@ -112,9 +162,7 @@ export async function rpc<T = unknown>(op: string, body: Record<string, unknown>
       .select()
       .single();
     if (error?.code === "23505") {
-      throw new Error(
-        "This database still allows only one class per teacher. Run supabase/sql-chunks/05-multi-class.sql in the Supabase SQL editor, then try again.",
-      );
+      throw new Error("You already have a class. Open it and put a lesson on the board.");
     }
     throwIf(error);
     return mapClass(data, "teacher") as T;
@@ -152,7 +200,23 @@ export async function rpc<T = unknown>(op: string, body: Record<string, unknown>
       author_id: user.id,
       body: text,
     });
-    throwIf(error);
+    if (!error) return { ok: true } as T;
+    if (!missingTable(error)) throwIf(error);
+    const room = await ensureStream(supabase, classroomId, user.id);
+    const notes = Array.isArray((room.sim as { notes?: unknown }).notes)
+      ? ((room.sim as { notes: { id: string; body: string; author_id: string; created_at: string }[] }).notes)
+      : [];
+    const note = {
+      id: crypto.randomUUID(),
+      body: text,
+      author_id: user.id,
+      created_at: new Date().toISOString(),
+    };
+    const { error: upErr } = await supabase
+      .from("rooms")
+      .update({ sim: { ...(room.sim as object), notes: [note, ...notes].slice(0, 30) } })
+      .eq("id", room.id);
+    throwIf(upErr);
     return { ok: true } as T;
   }
 
@@ -194,34 +258,36 @@ export async function rpc<T = unknown>(op: string, body: Record<string, unknown>
       { data: enrollments },
       { data: rooms },
       annRes,
-      liveRes,
     ] = await Promise.all([
       supabase.from("assignments").select("*").eq("classroom_id", classroomId).order("created_at", { ascending: false }),
       supabase.from("enrollments").select("student_id, joined_at").eq("classroom_id", classroomId),
       supabase.from("rooms").select("*").eq("classroom_id", classroomId).order("created_at", { ascending: false }),
       supabase.from("announcements").select("*").eq("classroom_id", classroomId).order("created_at", { ascending: false }),
-      supabase.from("live_sessions").select("*").eq("classroom_id", classroomId).order("created_at", { ascending: false }),
     ]);
-    const announcements = annRes.error ? [] : annRes.data;
-    const lives = liveRes.error ? [] : liveRes.data;
+    const roomList = rooms ?? [];
+    const stream = roomList.find((r) => r.lab_type === "stream");
+    const streamNotes = Array.isArray((stream?.sim as { notes?: unknown } | undefined)?.notes)
+      ? ((stream!.sim as { notes: { id: string; body: string; author_id: string; created_at: string }[] }).notes)
+      : [];
+    const announcements = annRes.error
+      ? streamNotes.map((n) => ({ id: n.id, body: n.body, author_id: n.author_id, created_at: n.created_at }))
+      : annRes.data;
+    const lives = roomList.filter((r) => r.lab_type !== "stream" && pinOf(r.sim));
 
     const ids = (enrollments ?? []).map((e) => e.student_id);
-    const roomIds = (rooms ?? []).map((r) => r.id);
+    const roomIds = roomList.map((r) => r.id);
     const assignIds = (assignments ?? []).map((a) => a.id);
-    const liveIds = (lives ?? []).map((s) => s.id);
 
-    const [{ data: peopleRows }, { data: players }, { data: kaOpens }, { data: attempts }, { data: livePlayers }] =
+    const [{ data: peopleRows }, { data: players }, { data: kaOpens }, { data: attempts }] =
       await Promise.all([
         ids.length ? supabase.from("profiles").select("id, name, xp, streak").in("id", ids) : Promise.resolve({ data: [] }),
         roomIds.length ? supabase.from("room_players").select("*").in("room_id", roomIds) : Promise.resolve({ data: [] }),
         assignIds.length ? supabase.from("ka_opens").select("*").in("assignment_id", assignIds) : Promise.resolve({ data: [] }),
         assignIds.length ? supabase.from("attempts").select("*").in("assignment_id", assignIds) : Promise.resolve({ data: [] }),
-        liveIds.length ? supabase.from("live_players").select("*").in("session_id", liveIds) : Promise.resolve({ data: [] }),
       ]);
 
     const playerIds = [...new Set((players ?? []).map((p) => p.user_id))];
-    const liveUserIds = [...new Set((livePlayers ?? []).map((p) => p.user_id))];
-    const extraIds = [...new Set([...playerIds, ...liveUserIds])];
+    const extraIds = [...new Set(playerIds)];
     const { data: extraProfiles } = extraIds.length
       ? await supabase.from("profiles").select("id, name, xp").in("id", extraIds)
       : { data: [] };
@@ -246,21 +312,24 @@ export async function rpc<T = unknown>(op: string, body: Record<string, unknown>
         }),
     }));
 
-    const livesOut = (lives ?? []).map((s) => ({
-      id: s.id,
-      classroomId: s.classroom_id,
-      topicId: s.topic_id,
-      labType: s.lab_type,
-      pin: s.pin,
-      status: s.status,
-      sim: s.sim,
-      players: (livePlayers ?? [])
-        .filter((p) => p.session_id === s.id)
-        .map((p) => {
-          const pr = extraProfiles?.find((x) => x.id === p.user_id);
-          return { userId: p.user_id, name: pr?.name ?? "Student", score: p.score, roleKey: p.role_key };
-        }),
-    }));
+    const livesOut = lives.map((s) => {
+      const scores = scoresOf(s.sim);
+      return {
+        id: s.id,
+        classroomId: s.classroom_id,
+        topicId: (assignments ?? []).find((a) => a.id === s.assignment_id)?.topic_id ?? "",
+        labType: s.lab_type,
+        pin: pinOf(s.sim),
+        status: s.status,
+        sim: s.sim,
+        players: (players ?? [])
+          .filter((p) => p.room_id === s.id)
+          .map((p) => {
+            const pr = extraProfiles?.find((x) => x.id === p.user_id);
+            return { userId: p.user_id, name: pr?.name ?? "Student", score: scores[p.user_id] ?? 0, roleKey: p.role_key };
+          }),
+      };
+    });
 
     return {
       user: {
@@ -470,91 +539,110 @@ export async function rpc<T = unknown>(op: string, body: Record<string, unknown>
     const classroomId = String(body.classroomId);
     const topic = getTopic(String(body.topicId ?? ""));
     if (!topic) throw new Error("Unknown topic.");
-    await supabase
-      .from("live_sessions")
-      .update({ status: "complete" })
-      .eq("classroom_id", classroomId)
-      .neq("status", "complete");
-    const lab = ((body.labType as LabType) || topic.labType);
-    const { data: session, error } = await supabase
-      .from("live_sessions")
+    const lab = (body.labType as LabType) || topic.labType;
+    await supabase.from("rooms").update({ status: "complete" }).eq("classroom_id", classroomId).neq("status", "complete");
+    const { data: assignment, error: aErr } = await supabase
+      .from("assignments")
+      .insert({ classroom_id: classroomId, topic_id: topic.id, lab_type: lab })
+      .select()
+      .single();
+    throwIf(aErr);
+    const pin = code(6);
+    const { data: room, error } = await supabase
+      .from("rooms")
       .insert({
         classroom_id: classroomId,
-        topic_id: topic.id,
+        assignment_id: assignment.id,
         lab_type: lab,
-        pin: code(6),
         host_id: user.id,
         status: "lobby",
-        sim: emptySim(lab, topic.id),
+        hearts: MAX_HEARTS,
+        level_index: 0,
+        sim: { ...emptySim(lab, topic.id), pin, scores: {} },
       })
       .select()
       .single();
     throwIf(error);
-    return { id: session.id, pin: session.pin } as T;
+    return { id: room.id, pin } as T;
   }
 
   if (op === "joinLive") {
     const pin = String(body.pin ?? "").trim().toUpperCase();
-    const { data: session } = await supabase.from("live_sessions").select("*").eq("pin", pin).maybeSingle();
-    if (!session) throw new Error("No live game with that PIN.");
-    const { error: enErr } = await supabase
-      .from("enrollments")
-      .insert({ classroom_id: session.classroom_id, student_id: user.id });
-    if (enErr && enErr.code !== "23505") throwIf(enErr);
+    const classCode = String(body.code ?? "").trim().toUpperCase();
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-    if (profile?.role === "teacher") {
-      return { id: session.id, classroomId: session.classroom_id } as T;
+    if (profile?.role === "student" && classCode) {
+      const { data: classroom } = await supabase.from("classrooms").select("id").eq("code", classCode).maybeSingle();
+      if (classroom) {
+        const { error: enErr } = await supabase
+          .from("enrollments")
+          .insert({ classroom_id: classroom.id, student_id: user.id });
+        if (enErr && enErr.code !== "23505") throwIf(enErr);
+      }
     }
-    const { data: existing } = await supabase
-      .from("live_players")
-      .select("*")
-      .eq("session_id", session.id)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (!existing) {
-      const { count } = await supabase
-        .from("live_players")
-        .select("*", { count: "exact", head: true })
-        .eq("session_id", session.id);
-      const { error } = await supabase.from("live_players").insert({
-        session_id: session.id,
-        user_id: user.id,
-        role_key: roleForIndex(session.lab_type, count ?? 0),
-      });
-      throwIf(error);
+    const { data: openRooms, error: roomErr } = await supabase.from("rooms").select("*").in("status", ["lobby", "playing"]);
+    throwIf(roomErr);
+    const session = (openRooms ?? []).find((r) => pinOf(r.sim) === pin && r.lab_type !== "stream");
+    if (!session) throw new Error("No live game with that PIN. Scan the code on the board.");
+    if (profile?.role !== "teacher") {
+      const { error: enErr } = await supabase
+        .from("enrollments")
+        .insert({ classroom_id: session.classroom_id, student_id: user.id });
+      if (enErr && enErr.code !== "23505") throwIf(enErr);
+      const { data: existing } = await supabase
+        .from("room_players")
+        .select("user_id")
+        .eq("room_id", session.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!existing) {
+        const { count } = await supabase
+          .from("room_players")
+          .select("*", { count: "exact", head: true })
+          .eq("room_id", session.id);
+        const { error } = await supabase.from("room_players").insert({
+          room_id: session.id,
+          user_id: user.id,
+          role_key: roleForIndex(session.lab_type, count ?? 0),
+        });
+        throwIf(error);
+      }
     }
     return { id: session.id, classroomId: session.classroom_id } as T;
   }
 
   if (op === "startLive") {
-    const { error } = await supabase.from("live_sessions").update({ status: "playing" }).eq("id", String(body.sessionId));
+    const { error } = await supabase.from("rooms").update({ status: "playing" }).eq("id", String(body.sessionId));
     throwIf(error);
     return { ok: true } as T;
   }
 
   if (op === "endLive") {
-    const { error } = await supabase.from("live_sessions").update({ status: "complete" }).eq("id", String(body.sessionId));
+    const { error } = await supabase.from("rooms").update({ status: "complete" }).eq("id", String(body.sessionId));
     throwIf(error);
     return { ok: true } as T;
   }
 
   if (op === "live") {
     const sessionId = String(body.sessionId);
-    const { data: session, error } = await supabase.from("live_sessions").select("*").eq("id", sessionId).single();
+    const { data: session, error } = await supabase.from("rooms").select("*").eq("id", sessionId).single();
     throwIf(error);
-    if (!session) throw new Error("Live game not found.");
-    const topic = getTopic(session.topic_id);
-    const { data: players } = await supabase.from("live_players").select("*").eq("session_id", sessionId);
+    if (!session || !pinOf(session.sim)) throw new Error("Live game not found.");
+    const { data: assignment } = await supabase.from("assignments").select("topic_id").eq("id", session.assignment_id).maybeSingle();
+    const topic = getTopic(assignment?.topic_id ?? "");
+    const { data: classroom } = await supabase.from("classrooms").select("code").eq("id", session.classroom_id).maybeSingle();
+    const { data: players } = await supabase.from("room_players").select("*").eq("room_id", sessionId);
     const ids = (players ?? []).map((p) => p.user_id);
     const { data: profiles } = ids.length ? await supabase.from("profiles").select("id, name").in("id", ids) : { data: [] };
     const { data: meProfile } = await supabase.from("profiles").select("role, name").eq("id", user.id).single();
+    const scores = scoresOf(session.sim);
     return {
       session: {
         id: session.id,
         classroomId: session.classroom_id,
-        topicId: session.topic_id,
+        classroomCode: classroom?.code ?? "",
+        topicId: assignment?.topic_id ?? "",
         labType: session.lab_type,
-        pin: session.pin,
+        pin: pinOf(session.sim),
         status: session.status,
         sim: session.sim,
         hostId: session.host_id,
@@ -562,7 +650,7 @@ export async function rpc<T = unknown>(op: string, body: Record<string, unknown>
       topic,
       players: (players ?? []).map((p) => ({
         userId: p.user_id,
-        score: p.score,
+        score: scores[p.user_id] ?? 0,
         roleKey: p.role_key,
         name: profiles?.find((x) => x.id === p.user_id)?.name ?? "Student",
       })),
@@ -572,7 +660,7 @@ export async function rpc<T = unknown>(op: string, body: Record<string, unknown>
 
   if (op === "liveMove") {
     const sessionId = String(body.sessionId);
-    const { data: session } = await supabase.from("live_sessions").select("*").eq("id", sessionId).single();
+    const { data: session } = await supabase.from("rooms").select("*").eq("id", sessionId).single();
     if (!session) throw new Error("Live game not found.");
     if (session.status !== "playing") throw new Error("The teacher has not started yet.");
     const { data: profile } = await supabase.from("profiles").select("name").eq("id", user.id).single();
@@ -580,25 +668,25 @@ export async function rpc<T = unknown>(op: string, body: Record<string, unknown>
       type: String(body.type ?? ""),
       payload: { ...(body.payload as Record<string, unknown>), name: profile?.name ?? "Student" },
     });
-    const patch: Record<string, unknown> = { sim: result.sim };
-    if (result.success || result.failTag) {
-      patch.status = "complete";
-    }
-    const { error } = await supabase.from("live_sessions").update(patch).eq("id", sessionId);
+    const prev = scoresOf(session.sim);
+    const hit = (result.sim as { last?: boolean }).last === true || Boolean(result.success);
+    const scores = { ...prev };
+    if (hit) scores[user.id] = (prev[user.id] ?? 0) + 10;
+    const sim = { ...result.sim, pin: pinOf(session.sim), scores };
+    const patch: Record<string, unknown> = { sim };
+    if (result.success || result.failTag) patch.status = "complete";
+    const { error } = await supabase.from("rooms").update(patch).eq("id", sessionId);
     throwIf(error);
-    const hit = (result.sim as { last?: boolean }).last === true || result.success;
-    if (hit) {
-      const { data: lp } = await supabase
-        .from("live_players")
-        .select("score")
-        .eq("session_id", sessionId)
-        .eq("user_id", user.id)
-        .maybeSingle();
-      await supabase
-        .from("live_players")
-        .update({ score: (lp?.score ?? 0) + 10 })
-        .eq("session_id", sessionId)
-        .eq("user_id", user.id);
+    const tag = result.failTag || ((result.sim as { last?: boolean | null }).last === false ? session.lab_type : "");
+    if (result.success || tag) {
+      await supabase.from("attempts").insert({
+        assignment_id: session.assignment_id,
+        room_id: session.id,
+        student_id: user.id,
+        passed: Boolean(result.success) && !result.failTag,
+        concept_tag: result.failTag || tag || "review",
+        xp_awarded: result.success ? 8 : 0,
+      });
     }
     if (result.success) {
       const { data: pr } = await supabase.from("profiles").select("xp, streak").eq("id", user.id).single();

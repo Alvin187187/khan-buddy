@@ -17,6 +17,7 @@ export default function LessonPage() {
   const [a, setA] = useState("");
   const [b, setB] = useState("");
   const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState("");
 
   if (!topic) return <p>Missing lesson.</p>;
   const isTeacher = data?.classroom?.teacherId === data?.user?.id;
@@ -32,6 +33,7 @@ export default function LessonPage() {
       <div>
         <p className="text-xs font-bold text-primary">{topic.subject}</p>
         <h1 className="text-2xl font-black">{topic.title}</h1>
+        <p className="mt-1 text-sm font-bold text-muted">{topic.playPrompt}</p>
       </div>
 
       <ol className="grid grid-cols-3 gap-2 text-center text-xs font-bold">
@@ -76,25 +78,35 @@ export default function LessonPage() {
             {isTeacher ? (
               <Button
                 className="mt-3 w-full"
+                disabled={busy === g.name}
                 onClick={async () => {
-                  await rpc("assign", { classroomId: classId, topicId: topic.id }).catch(() => {});
-                  const s = await rpc<{ id: string }>("createLive", {
-                    classroomId: classId,
-                    topicId: topic.id,
-                    labType: g.labType,
-                  });
-                  router.push(`/play/${s.id}`);
+                  setBusy(g.name);
+                  setMsg("");
+                  try {
+                    await rpc("assign", { classroomId: classId, topicId: topic.id }).catch(() => {});
+                    const s = await rpc<{ id: string }>("createLive", {
+                      classroomId: classId,
+                      topicId: topic.id,
+                      labType: g.labType,
+                    });
+                    router.push(`/play/${s.id}`);
+                  } catch (e) {
+                    setMsg(e instanceof Error ? e.message : "Could not start");
+                    setBusy("");
+                  }
                 }}
               >
-                On the board
+                {busy === g.name ? "Opening…" : "Put on the board"}
               </Button>
             ) : null}
           </div>
         ))}
-        {!isTeacher && live ? (
+        {!data ? <p className="text-sm text-muted">Loading…</p> : null}
+        {data && !isTeacher && live ? (
           <Button onClick={() => router.push(`/play/${live.id}`)}>Join {live.pin}</Button>
         ) : null}
-        {!isTeacher && !live ? <p className="text-sm text-muted">Wait for the board.</p> : null}
+        {data && !isTeacher && !live ? <p className="text-sm font-bold text-muted">Wait for the PIN on the board.</p> : null}
+        {msg ? <p role="alert" className="text-sm font-bold text-danger">{msg}</p> : null}
       </section>
 
       {isTeacher && data?.people ? (

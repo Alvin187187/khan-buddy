@@ -22,6 +22,7 @@ export default function InsightsPage() {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-2xl font-black">Results</h1>
+      <p className="text-sm font-bold text-muted">Who played. What to review.</p>
       {liveNow ? (
         <Link href={`/play/${liveNow.id}`} className="font-extrabold text-primary">
           Live · {gameName(liveNow.topicId)} · {liveNow.players.length}

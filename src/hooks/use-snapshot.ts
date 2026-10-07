@@ -113,10 +113,10 @@ export function useLive(sessionId: string) {
       .channel(`live-${sessionId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "live_sessions", filter: `id=eq.${sessionId}` },
+        { event: "*", schema: "public", table: "rooms", filter: `id=eq.${sessionId}` },
         soft,
       )
-      .on("postgres_changes", { event: "*", schema: "public", table: "live_players" }, soft)
+      .on("postgres_changes", { event: "*", schema: "public", table: "room_players" }, soft)
       .subscribe();
     const iv = setInterval(load, 4000);
     return () => {

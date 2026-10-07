@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { HomeShell } from "@/components/shell";
 import { Button, Field, Input } from "@/components/ui";
-import { classHue } from "@/lib/cn";
 import { rpc } from "@/lib/rpc";
 import type { ClassCard, PublicUser } from "@/lib/types";
 
@@ -16,6 +15,7 @@ export default function HomePage() {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [msg, setMsg] = useState("");
+  const [making, setMaking] = useState(false);
 
   useEffect(() => {
     rpc<{ user: PublicUser | null; classrooms: ClassCard[] }>("me").then((d) => {
@@ -32,21 +32,28 @@ export default function HomePage() {
   return (
     <HomeShell name={user.name}>
       <h1 className="text-2xl font-black">Classes</h1>
+      <p className="mt-1 text-sm font-bold text-muted">Open a class. Board a game.</p>
       {classes.length === 0 ? (
-        <p className="mt-2 text-muted">{user.role === "teacher" ? "Create your first class." : "Join with the code on the board."}</p>
+        <p className="mt-2 text-muted">{user.role === "teacher" ? "Name it. Then pick a lesson." : "Join with the code on the board."}</p>
       ) : (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {classes.map((c) => (
             <Link key={c.id} href={`/c/${c.id}`} className="block overflow-hidden rounded-[12px] border border-line bg-surface">
-              <div className="h-16 px-4 py-3 text-white" style={{ background: classHue(c.id) }}>
+              <div className="bg-primary px-4 py-3 text-white">
                 <p className="truncate font-black">{c.name}</p>
-                <p className="text-xs opacity-90">{c.code}</p>
+                <p className="text-xs font-bold tracking-[0.14em] opacity-90">{c.code}</p>
               </div>
+              <p className="px-4 py-3 text-sm font-extrabold text-primary">Open lessons</p>
             </Link>
           ))}
         </div>
       )}
-      {user.role === "teacher" ? (
+      {user.role === "teacher" && classes.length > 0 && !making ? (
+        <button className="mt-4 self-start text-sm font-extrabold text-primary" onClick={() => setMaking(true)}>
+          New class
+        </button>
+      ) : null}
+      {user.role === "teacher" && (classes.length === 0 || making) ? (
         <div className="mt-6 flex flex-col gap-3">
           <Field label="Class name" htmlFor="cname">
             <Input id="cname" placeholder="STEM 11 Biology" value={name} onChange={(e) => setName(e.target.value)} />
@@ -65,7 +72,8 @@ export default function HomePage() {
             Create class
           </Button>
         </div>
-      ) : (
+      ) : null}
+      {user.role === "student" ? (
         <div className="mt-6 flex flex-col gap-3">
           <Field label="Class code" htmlFor="code">
             <Input id="code" value={code} autoCapitalize="characters" onChange={(e) => setCode(e.target.value.toUpperCase())} />
@@ -84,7 +92,7 @@ export default function HomePage() {
             Join
           </Button>
         </div>
-      )}
+      ) : null}
     </HomeShell>
   );
 }

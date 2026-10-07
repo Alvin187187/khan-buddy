@@ -22,12 +22,15 @@ export default function PlayPage() {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-2xl font-black">Board</h1>
+      <p className="text-sm font-bold text-muted">
+        {isTeacher ? "Show the PIN. They scan. You start." : "PIN's on the board. Tap Play."}
+      </p>
 
       {live ? (
         <div className="flex flex-col gap-3">
           <p className="font-black">{gameTitle(live.topicId, live.labType)}</p>
           {isTeacher ? (
-            <QrCard url={`${origin}/join?pin=${live.pin}&from=/c/${classId}`} pin={live.pin} />
+            <QrCard url={`${origin}/join?pin=${live.pin}&code=${data.classroom.code}&from=/c/${classId}`} pin={live.pin} />
           ) : (
             <div className="rounded-[12px] bg-[#1a1916] p-5 text-center text-[#f6f1e8]">
               <p className="text-xs font-bold uppercase tracking-wider opacity-70">PIN</p>
@@ -49,7 +52,7 @@ export default function PlayPage() {
         </div>
       ) : isTeacher ? (
         <div className="flex flex-col gap-4">
-          <p className="text-muted">Open a lesson, then put a game on the board.</p>
+          <p className="font-bold">Nothing live. Pick a lesson.</p>
           {SUBJECTS.map((s) => (
             <section key={s.id} className="flex flex-col gap-2">
               <h2 className="font-black">{s.title}</h2>

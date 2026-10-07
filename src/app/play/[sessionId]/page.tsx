@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AppChrome } from "@/components/app-chrome";
 import { GameBoard } from "@/components/games";
@@ -50,10 +51,10 @@ export default function PlaySessionPage() {
             <div className="rounded-[12px] bg-[#1a1916] p-5 text-center text-[#f6f1e8]">
               <p className="text-xs font-bold uppercase tracking-wider opacity-70">Game PIN</p>
               <p className="mt-1 text-5xl font-black tracking-[0.2em]">{session.pin}</p>
-              <p className="mt-3 text-sm">{players.length} in</p>
+              <p className="mt-3 text-sm">{players.length} in · scan, then start</p>
             </div>
             {isHost ? (
-              <QrCard url={`${origin}/join?pin=${session.pin}&from=/c/${session.classroomId}`} />
+              <QrCard url={`${origin}/join?pin=${session.pin}&code=${session.classroomCode ?? ""}&from=/c/${session.classroomId}`} />
             ) : null}
             <div className="flex flex-wrap gap-2">
               {players.map((p: { userId: string; name: string }, i: number) => (
@@ -69,7 +70,7 @@ export default function PlaySessionPage() {
             {isHost ? (
               <Button onClick={() => rpc("startLive", { sessionId: session.id })}>Start</Button>
             ) : (
-              <p className="text-muted">On the board</p>
+              <p className="font-bold">You're in. Eyes on the board.</p>
             )}
           </>
         ) : null}
@@ -89,12 +90,17 @@ export default function PlaySessionPage() {
 
         {session.status === "complete" ? (
           <div className="flex flex-col gap-3">
-            <p className="text-xl font-black">Podium</p>
+            <p className="text-xl font-black">Round over</p>
             {podium.map((p: { userId: string; name: string; score: number }, i: number) => (
               <p key={p.userId} className="font-extrabold">
                 {i + 1}. {p.name} · {p.score}
               </p>
             ))}
+            {isHost ? (
+              <Link href={`/c/${session.classroomId}/insights`} className="font-extrabold text-primary">
+                See who missed
+              </Link>
+            ) : null}
             {topic ? (
               <a
                 className="inline-flex min-h-12 items-center justify-center rounded-[8px] bg-accent font-extrabold text-white"

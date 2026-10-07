@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, QrCode, Users, Monitor } from "lucide-react";
+import { BookOpen, QrCode, Users, Monitor, BarChart3 } from "lucide-react";
 import { rpc } from "@/lib/rpc";
 import { cn } from "@/lib/cn";
 import type { Role } from "@/lib/types";
@@ -80,6 +80,7 @@ export function ClassShell({
     { href: `/c/${classId}`, label: "Lessons", icon: BookOpen },
     { href: `/c/${classId}/play`, label: "Board", icon: Monitor },
     { href: `/c/${classId}/people`, label: "People", icon: Users },
+    { href: `/c/${classId}/insights`, label: "Results", icon: BarChart3 },
     { href: `/c/${classId}/join`, label: "Scan", icon: QrCode },
   ];
   const studentTabs = [
@@ -107,9 +108,11 @@ export function ClassShell({
                 ? path === `/c/${classId}` || path.includes("/l/")
                 : t.label === "Scan"
                   ? path.includes("/join")
-                  : t.label === "Board"
+                  :               t.label === "Board"
                     ? path.startsWith(`/c/${classId}/play`) || path.startsWith("/play/")
-                    : path === base || path.startsWith(base + "/");
+                    : t.label === "Results"
+                      ? path.includes("/insights")
+                      : path === base || path.startsWith(base + "/");
             const Icon = t.icon;
             return (
               <Link

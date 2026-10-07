@@ -12,13 +12,14 @@ export default function PeoplePage() {
   return (
     <div className="flex flex-col gap-3">
       <h1 className="text-2xl font-black">People</h1>
+      <p className="text-sm font-bold text-muted">Code {data.classroom.code}. They scan in.</p>
       {data.people.map((p: { id: string; name: string; xp: number }) => (
         <Card key={p.id} className="flex items-center justify-between">
           <p className="font-extrabold">{p.name}</p>
           <p className="text-sm font-bold text-primary">{p.xp}</p>
         </Card>
       ))}
-      {data.people.length === 0 ? <p className="text-muted">Empty</p> : null}
+      {data.people.length === 0 ? <p className="text-muted">No one yet. Share the code.</p> : null}
     </div>
   );
 }

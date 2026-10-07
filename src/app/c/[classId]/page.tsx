@@ -20,9 +20,10 @@ export default function LessonsPage() {
         <img src="/logo.png" alt="" className="h-12 w-auto" />
         <div>
           <h1 className="text-2xl font-black leading-tight">{data.classroom.name}</h1>
-          <p className="text-sm font-bold text-muted">{data.classroom.code}</p>
+          <p className="text-sm font-bold text-muted">Code {data.classroom.code}</p>
         </div>
       </div>
+      <p className="text-sm font-extrabold text-primary">Read it. Board it. They play.</p>
 
       {live ? (
         <Link href={`/play/${live.id}`} className="rounded-[12px] bg-foreground px-4 py-4 text-background">
@@ -45,7 +46,7 @@ export default function LessonsPage() {
                 className="rounded-[12px] border border-line bg-surface px-4 py-4"
               >
                 <p className="text-lg font-black">{t.title}</p>
-                <p className="mt-1 text-sm text-muted">{t.games.map((g) => g.name).join(" · ")}</p>
+                <p className="mt-1 text-sm text-muted">{t.playPrompt}</p>
               </Link>
             );
           })}

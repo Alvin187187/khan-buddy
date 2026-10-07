@@ -35,7 +35,7 @@ export function JoinForm() {
         return;
       }
       if (mode === "live") {
-        const s = await rpc<{ id: string }>("joinLive", { pin });
+        const s = await rpc<{ id: string }>("joinLive", { pin, code: code || params.get("code") || "" });
         router.push(`/play/${s.id}`);
         return;
       }
@@ -51,6 +51,7 @@ export function JoinForm() {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-2xl font-black">Join</h1>
+      <p className="text-sm font-bold text-muted">Class code, or the PIN on the board.</p>
       <div className="grid grid-cols-2 gap-2">
         {(["class", "live"] as const).map((m) => (
           <button
