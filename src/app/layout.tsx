@@ -11,8 +11,7 @@ const nunito = Nunito({
 
 export const metadata: Metadata = {
   title: "Khan Buddy",
-  description:
-    "A class for Khan Academy: learn on KA, then peer labs in pairs or tables of 3–5.",
+  description: "Put a Khan Academy lesson on the board as a 5-minute class game. PIN in. Play.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

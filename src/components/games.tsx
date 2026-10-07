@@ -13,49 +13,59 @@ function useGo(roomId: string, live?: boolean) {
   return (type: string, payload: Record<string, unknown> = {}) => rpc(op, { [idKey]: roomId, type, payload });
 }
 
+const KAHOOT = ["#e21b3c", "#1368ce", "#d89e00", "#26890c"] as const;
+
 export function VirusLab({
   roomId,
   sim,
   canPlay,
   live,
+  board,
 }: {
   roomId: string;
   sim: { hp: number; spread: number; q: number; last: boolean | null; log: string };
   canPlay: boolean;
   live?: boolean;
+  board?: boolean;
 }) {
   const go = useGo(roomId, live);
   const q = Qs[sim.q % Qs.length];
   return (
     <div className="flex flex-col gap-3">
-      <div className="overflow-hidden rounded-[12px] border border-line bg-[#1a1916] p-4 text-[#f6f1e8]">
-        <p className="text-xl font-black">Class vs Virus</p>
-        <div className="mt-4 space-y-2">
-          <p className="text-xs font-bold">Virus HP {sim.hp}%</p>
-          <div className="h-3 overflow-hidden rounded bg-white/15">
-            <div className="h-full bg-[#e11d48]" style={{ width: `${sim.hp}%` }} />
-          </div>
-          <p className="text-xs font-bold">Spread {sim.spread}%</p>
-          <div className="h-3 overflow-hidden rounded bg-white/15">
-            <div className="h-full bg-[#e2a100]" style={{ width: `${sim.spread}%` }} />
-          </div>
+      <div className="overflow-hidden rounded-[12px] bg-[#1a1916] p-4 text-[#f6f1e8]">
+        <div className="flex gap-3 text-xs font-bold">
+          <span>HP {sim.hp}</span>
+          <span>Spread {sim.spread}</span>
         </div>
-        <p className="mt-3 text-sm">{sim.log}</p>
+        <div className="mt-2 h-2 overflow-hidden rounded bg-white/15">
+          <div className="h-full bg-[#e11d48]" style={{ width: `${sim.hp}%` }} />
+        </div>
+        <p className="mt-4 text-xl font-black leading-snug">{q.q}</p>
+        {board ? (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            {q.choices.map((c, i) => (
+              <div key={c} className="rounded-[8px] px-3 py-3 text-sm font-extrabold text-white" style={{ background: KAHOOT[i] }}>
+                {c}
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <p className="mt-3 text-sm opacity-80">{sim.log}</p>
       </div>
-      {canPlay ? (
-        <Card className="flex flex-col gap-2">
-          <p className="font-black">{q.q}</p>
+      {canPlay && !board ? (
+        <div className="grid grid-cols-2 gap-2">
           {q.choices.map((c, i) => (
-            <Button key={c} variant="secondary" className="justify-start" onClick={() => go("answer", { choice: i })}>
+            <button
+              key={c}
+              className="min-h-20 rounded-[8px] px-3 py-3 text-left text-sm font-extrabold text-white"
+              style={{ background: KAHOOT[i] }}
+              onClick={() => go("answer", { choice: i })}
+            >
               {c}
-            </Button>
+            </button>
           ))}
-        </Card>
-      ) : (
-        <p className="text-sm text-muted">Board view</p>
-      )}
-      {sim.last === true ? <p className="font-bold text-primary">Hit.</p> : null}
-      {sim.last === false ? <p className="font-bold text-danger">Miss — it spread.</p> : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -309,6 +319,7 @@ export function GameBoard(props: {
   canPlay: boolean;
   levelIndex?: number;
   live?: boolean;
+  board?: boolean;
 }) {
   const { labType, ...rest } = props;
   const levelIndex = rest.levelIndex ?? 0;

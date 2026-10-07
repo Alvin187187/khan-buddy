@@ -1,95 +1,62 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
-import { QrCard } from "@/components/qr-card";
-import { Button, Card, Input } from "@/components/ui";
 import { useSnapshot } from "@/hooks/use-snapshot";
-import { rpc } from "@/lib/rpc";
-import { gameName, getTopic } from "@/lib/topics";
+import { SUBJECTS, gameTitle, getTopic } from "@/lib/topics";
 
-export default function StreamPage() {
+export default function LessonsPage() {
   const { classId } = useParams<{ classId: string }>();
-  const { data, error, reload } = useSnapshot(classId);
-  const [body, setBody] = useState("");
-  const [msg, setMsg] = useState("");
-
+  const { data, error } = useSnapshot(classId);
   if (!data && !error) return <p className="text-muted">Loading…</p>;
   if (error) return <p className="font-bold text-danger">{error}</p>;
 
-  const { user, classroom } = data;
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const isTeacher = classroom.teacherId === user.id;
   const live = (data.lives ?? []).find((l: { status: string }) => l.status !== "complete");
+  const pairs = (data.announcements ?? []).filter((a: { body: string }) => a.body.startsWith("Pair ·"));
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-2xl font-black">{classroom.name}</h1>
-        <p className="text-sm font-black tracking-wide">{classroom.code}</p>
+    <div className="flex flex-col gap-8">
+      <div className="flex items-center gap-3">
+        <img src="/logo.png" alt="" className="h-12 w-auto" />
+        <div>
+          <h1 className="text-2xl font-black leading-tight">{data.classroom.name}</h1>
+          <p className="text-sm font-bold text-muted">{data.classroom.code}</p>
+        </div>
       </div>
 
-      {isTeacher ? (
-        <QrCard url={`${origin}/join?code=${classroom.code}&from=/c/${classId}`} pin={classroom.code} />
-      ) : null}
-
       {live ? (
-        <Button onClick={() => (window.location.href = `/play/${live.id}`)}>
-          Live · {gameName(live.topicId)}
-        </Button>
+        <Link href={`/play/${live.id}`} className="rounded-[12px] bg-foreground px-4 py-4 text-background">
+          <p className="text-sm font-bold">On the board</p>
+          <p className="text-xl font-black">{gameTitle(live.topicId, live.labType)}</p>
+          <p className="mt-1 text-3xl font-black tracking-[0.12em]">{live.pin}</p>
+        </Link>
       ) : null}
 
-      {isTeacher ? (
-        <div className="flex flex-col gap-2">
-          <Input value={body} onChange={(e) => setBody(e.target.value)} placeholder="Announcement" />
-          {msg ? <p className="text-sm font-bold text-danger">{msg}</p> : null}
-          <Button
-            onClick={async () => {
-              try {
-                await rpc("announce", { classroomId: classId, body });
-                setBody("");
-                reload();
-              } catch (e) {
-                setMsg(e instanceof Error ? e.message : "Could not post");
-              }
-            }}
-          >
-            Post
-          </Button>
-        </div>
-      ) : null}
-
-      {(data.announcements ?? []).map((a: { id: string; body: string; createdAt: string }) => (
-        <Card key={a.id}>
-          <p className="text-sm leading-6">{a.body}</p>
-          <p className="mt-2 text-xs text-muted">{new Date(a.createdAt).toLocaleString()}</p>
-        </Card>
+      {SUBJECTS.map((s) => (
+        <section key={s.id} className="flex flex-col gap-2">
+          <h2 className="text-lg font-black">{s.title}</h2>
+          {s.lessons.map((id) => {
+            const t = getTopic(id);
+            if (!t) return null;
+            return (
+              <Link
+                key={id}
+                href={`/c/${classId}/l/${id}`}
+                className="rounded-[12px] border border-line bg-surface px-4 py-4"
+              >
+                <p className="text-lg font-black">{t.title}</p>
+                <p className="mt-1 text-sm text-muted">{t.games.map((g) => g.name).join(" · ")}</p>
+              </Link>
+            );
+          })}
+        </section>
       ))}
 
-      {(data.assignments ?? []).map((a: { id: string; topicId: string }) => {
-        const topic = getTopic(a.topicId);
-        if (!topic) return null;
-        return (
-          <Card key={a.id} className="flex flex-col gap-2">
-            <p className="font-black">{topic.title}</p>
-            <a
-              href={topic.kaUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex min-h-12 items-center justify-center rounded-[8px] bg-accent font-extrabold text-white"
-              onClick={() => rpc("openKa", { assignmentId: a.id })}
-            >
-              Khan Academy
-            </a>
-            <a
-              href={`/c/${classId}/play`}
-              className="inline-flex min-h-12 items-center justify-center rounded-[8px] border border-line font-extrabold"
-            >
-              {gameName(topic.id)}
-            </a>
-          </Card>
-        );
-      })}
+      {pairs.slice(0, 3).map((a: { id: string; body: string }) => (
+        <p key={a.id} className="text-sm font-bold">
+          {a.body.replace("Pair · ", "")}
+        </p>
+      ))}
     </div>
   );
 }

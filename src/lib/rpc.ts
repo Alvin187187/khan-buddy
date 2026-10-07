@@ -475,16 +475,17 @@ export async function rpc<T = unknown>(op: string, body: Record<string, unknown>
       .update({ status: "complete" })
       .eq("classroom_id", classroomId)
       .neq("status", "complete");
+    const lab = ((body.labType as LabType) || topic.labType);
     const { data: session, error } = await supabase
       .from("live_sessions")
       .insert({
         classroom_id: classroomId,
         topic_id: topic.id,
-        lab_type: topic.labType,
+        lab_type: lab,
         pin: code(6),
         host_id: user.id,
         status: "lobby",
-        sim: emptySim(topic.labType, topic.id),
+        sim: emptySim(lab, topic.id),
       })
       .select()
       .single();
@@ -585,10 +586,23 @@ export async function rpc<T = unknown>(op: string, body: Record<string, unknown>
     }
     const { error } = await supabase.from("live_sessions").update(patch).eq("id", sessionId);
     throwIf(error);
+    const hit = (result.sim as { last?: boolean }).last === true || result.success;
+    if (hit) {
+      const { data: lp } = await supabase
+        .from("live_players")
+        .select("score")
+        .eq("session_id", sessionId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      await supabase
+        .from("live_players")
+        .update({ score: (lp?.score ?? 0) + 10 })
+        .eq("session_id", sessionId)
+        .eq("user_id", user.id);
+    }
     if (result.success) {
       const { data: pr } = await supabase.from("profiles").select("xp, streak").eq("id", user.id).single();
       if (pr) await supabase.from("profiles").update({ xp: pr.xp + 8, streak: pr.streak + 1 }).eq("id", user.id);
-      await supabase.from("live_players").update({ score: 8 }).eq("session_id", sessionId).eq("user_id", user.id);
     }
     return { ok: true } as T;
   }

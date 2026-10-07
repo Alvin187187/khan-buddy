@@ -59,7 +59,7 @@ export function FunctionLab({
           ) : null}
         </svg>
       </div>
-      {canPlay && roleKey === "rule" ? (
+      {(canPlay && roleKey === "rule") || (live && !canPlay) ? (
         <div className="flex gap-2">
           <Button variant="secondary" className="flex-1" onClick={() => go("setX", { x: sim.x - 1 })}>
             x − 1
@@ -69,7 +69,7 @@ export function FunctionLab({
           </Button>
         </div>
       ) : null}
-      {canPlay && roleKey === "graph" ? (
+      {canPlay ? (
         <div className="flex flex-col gap-2">
           <p className="text-sm font-bold">Output for x = {sim.x}</p>
           <div className="grid grid-cols-4 gap-2">

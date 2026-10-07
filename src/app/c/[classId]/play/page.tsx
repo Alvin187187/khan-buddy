@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { QrCard } from "@/components/qr-card";
 import { Button } from "@/components/ui";
 import { useSnapshot } from "@/hooks/use-snapshot";
 import { rpc } from "@/lib/rpc";
-import { TOPICS, gameName } from "@/lib/topics";
+import { SUBJECTS, gameTitle, getTopic } from "@/lib/topics";
 
 export default function PlayPage() {
   const { classId } = useParams<{ classId: string }>();
@@ -17,23 +18,23 @@ export default function PlayPage() {
   const isTeacher = data.classroom.teacherId === data.user.id;
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const live = (data.lives ?? []).find((l: { status: string }) => l.status !== "complete");
-  const games = TOPICS.filter((t) => t.liveOk);
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-black">Play</h1>
+      <h1 className="text-2xl font-black">Board</h1>
 
       {live ? (
         <div className="flex flex-col gap-3">
-          <p className="text-sm font-bold text-primary">{gameName(live.topicId)}</p>
+          <p className="font-black">{gameTitle(live.topicId, live.labType)}</p>
           {isTeacher ? (
             <QrCard url={`${origin}/join?pin=${live.pin}&from=/c/${classId}`} pin={live.pin} />
           ) : (
-            <p className="text-3xl font-black tracking-[0.18em]">{live.pin}</p>
+            <div className="rounded-[12px] bg-[#1a1916] p-5 text-center text-[#f6f1e8]">
+              <p className="text-xs font-bold uppercase tracking-wider opacity-70">PIN</p>
+              <p className="text-4xl font-black tracking-[0.18em]">{live.pin}</p>
+            </div>
           )}
-          <Button onClick={() => router.push(`/play/${live.id}`)}>
-            {isTeacher ? "Host" : "Enter"}
-          </Button>
+          <Button onClick={() => router.push(`/play/${live.id}`)}>{isTeacher ? "Board" : "Play"}</Button>
           {isTeacher ? (
             <Button
               variant="secondary"
@@ -47,23 +48,21 @@ export default function PlayPage() {
           ) : null}
         </div>
       ) : isTeacher ? (
-        <div className="grid gap-2">
-          {games.map((t) => (
-            <button
-              key={t.id}
-              className="flex min-h-14 flex-col items-start rounded-[12px] border border-line bg-surface px-3 py-2 text-left"
-              onClick={async () => {
-                const s = await rpc<{ id: string }>("createLive", { classroomId: classId, topicId: t.id });
-                router.push(`/play/${s.id}`);
-              }}
-            >
-              <span className="font-extrabold">{gameName(t.id)}</span>
-              <span className="text-xs text-muted">{t.title}</span>
-            </button>
+        <div className="flex flex-col gap-4">
+          <p className="text-muted">Open a lesson, then put a game on the board.</p>
+          {SUBJECTS.map((s) => (
+            <section key={s.id} className="flex flex-col gap-2">
+              <h2 className="font-black">{s.title}</h2>
+              {s.lessons.map((id) => (
+                <Link key={id} href={`/c/${classId}/l/${id}`} className="rounded-[12px] border border-line bg-surface px-4 py-3 font-extrabold">
+                  {getTopic(id)?.title}
+                </Link>
+              ))}
+            </section>
           ))}
         </div>
       ) : (
-        <p className="text-muted">Wait for the PIN.</p>
+        <p className="text-muted">Wait for the PIN on the board.</p>
       )}
     </div>
   );

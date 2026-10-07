@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, QrCode, Users, BarChart3, Gamepad2, ClipboardList } from "lucide-react";
+import { BookOpen, QrCode, Users, Monitor } from "lucide-react";
 import { rpc } from "@/lib/rpc";
 import { cn } from "@/lib/cn";
 import type { Role } from "@/lib/types";
@@ -12,9 +12,7 @@ export function TopBar({ name }: { name: string }) {
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-background px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
       <Link href="/home" className="flex min-h-11 items-center gap-2 font-extrabold">
-        <span className="flex size-8 items-center justify-center rounded-[8px] bg-primary text-sm text-primary-ink">
-          KB
-        </span>
+        <img src="/logo.png" alt="" className="h-9 w-auto" />
         Khan Buddy
       </Link>
       <button
@@ -79,16 +77,14 @@ export function ClassShell({
 }) {
   const path = usePathname();
   const teacherTabs = [
-    { href: `/c/${classId}`, label: "Stream", icon: BookOpen },
-    { href: `/c/${classId}/work`, label: "Work", icon: ClipboardList },
+    { href: `/c/${classId}`, label: "Lessons", icon: BookOpen },
+    { href: `/c/${classId}/play`, label: "Board", icon: Monitor },
     { href: `/c/${classId}/people`, label: "People", icon: Users },
-    { href: `/c/${classId}/play`, label: "Play", icon: Gamepad2 },
-    { href: `/c/${classId}/insights`, label: "Results", icon: BarChart3 },
+    { href: `/c/${classId}/join`, label: "Scan", icon: QrCode },
   ];
   const studentTabs = [
-    { href: `/c/${classId}`, label: "Stream", icon: BookOpen },
-    { href: `/c/${classId}/work`, label: "Work", icon: ClipboardList },
-    { href: `/c/${classId}/play`, label: "Play", icon: Gamepad2 },
+    { href: `/c/${classId}`, label: "Lessons", icon: BookOpen },
+    { href: `/c/${classId}/play`, label: "Board", icon: Monitor },
     { href: `/c/${classId}/join`, label: "Scan", icon: QrCode },
   ];
   const tabs = role === "teacher" ? teacherTabs : studentTabs;
@@ -107,12 +103,12 @@ export function ClassShell({
           {tabs.map((t) => {
             const base = t.href.split("?")[0];
             const on =
-              t.label === "Stream"
-                ? path === `/c/${classId}`
+              t.label === "Lessons"
+                ? path === `/c/${classId}` || path.includes("/l/")
                 : t.label === "Scan"
                   ? path.includes("/join")
-                  : t.label === "Play"
-                    ? path.startsWith(`/c/${classId}/play`) || path.startsWith("/play/") || path.startsWith("/lab/")
+                  : t.label === "Board"
+                    ? path.startsWith(`/c/${classId}/play`) || path.startsWith("/play/")
                     : path === base || path.startsWith(base + "/");
             const Icon = t.icon;
             return (
