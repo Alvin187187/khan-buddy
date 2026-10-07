@@ -1,0 +1,22 @@
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+
+export async function createServerSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const store = await cookies();
+  return createServerClient(url, key, {
+    cookies: {
+      getAll() {
+        return store.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => store.set(name, value, options));
+        } catch {
+          /* set from Server Component can be ignored when middleware refreshed the session */
+        }
+      },
+    },
+  });
+}
