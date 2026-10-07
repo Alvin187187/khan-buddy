@@ -6,28 +6,77 @@ import { Suspense, useState } from "react";
 import { Button, Field, Input } from "@/components/ui";
 import { rpc } from "@/lib/rpc";
 
+function safeNext(raw: string | null) {
+  if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
+  return "/home";
+}
+
 function SignupForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const [role, setRole] = useState(params.get("role") === "teacher" ? "teacher" : "student");
+  const next = safeNext(params.get("next"));
+  const [role, setRole] = useState<"teacher" | "student" | null>(
+    params.get("role") === "teacher" || params.get("role") === "student" ? (params.get("role") as "teacher" | "student") : null,
+  );
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
+  if (!role) {
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5">
+        <img src="/logo.png" alt="" className="h-14 w-auto" />
+        <h1 className="mt-4 text-3xl font-black">Sign up</h1>
+        <div className="mt-8 grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            className="flex min-h-32 flex-col items-center justify-center gap-1 rounded-[12px] border border-line bg-surface px-3"
+            onClick={() => setRole("teacher")}
+          >
+            <span className="text-lg font-black">Teacher</span>
+            <span className="text-sm text-muted">Run a class</span>
+          </button>
+          <button
+            type="button"
+            className="flex min-h-32 flex-col items-center justify-center gap-1 rounded-[12px] border border-line bg-surface px-3"
+            onClick={() => setRole("student")}
+          >
+            <span className="text-lg font-black">Student</span>
+            <span className="text-sm text-muted">Join a class</span>
+          </button>
+        </div>
+        <Link href="/" className="mt-6 text-sm font-bold text-muted">
+          Back
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5">
-      <h1 className="text-3xl font-black">Sign up</h1>
+      <button type="button" className="self-start text-sm font-bold text-muted" onClick={() => setRole(null)}>
+        ← {role === "teacher" ? "Teacher" : "Student"}
+      </button>
+      <h1 className="mt-4 text-3xl font-black">Create account</h1>
       <form
         className="mt-6 flex flex-col gap-4"
         onSubmit={async (e) => {
           e.preventDefault();
+          if (name.trim().length < 2) {
+            setError("Add your name.");
+            return;
+          }
+          if (password.length < 6) {
+            setError("Password needs at least 6 characters.");
+            return;
+          }
           setPending(true);
           setError("");
           try {
             await rpc("signup", { name, email, password, role });
-            router.push("/home");
+            router.push(next);
             router.refresh();
           } catch (err) {
             setError(err instanceof Error ? err.message : "Could not sign up");
@@ -36,29 +85,22 @@ function SignupForm() {
           }
         }}
       >
-        <div className="grid grid-cols-2 gap-2">
-          {(["student", "teacher"] as const).map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setRole(r)}
-              aria-pressed={role === r}
-              className={`rounded-[8px] border px-3 font-extrabold capitalize ${
-                role === r ? "border-primary bg-highlight" : "border-line bg-surface"
-              }`}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
-        <Field label="Display name" htmlFor="name">
-          <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+        <Field label="Name" htmlFor="name">
+          <Input id="name" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label="Email" htmlFor="email">
-          <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
-        <Field label="Password" htmlFor="password">
-          <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <Field label="Password (6+ characters)" htmlFor="password">
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={6}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
         </Field>
         {error ? (
           <p role="alert" className="text-sm font-bold text-danger">

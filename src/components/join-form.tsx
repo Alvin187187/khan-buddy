@@ -30,7 +30,8 @@ export function JoinForm() {
     try {
       const me = await rpc<{ user: { role: string } | null }>("me");
       if (!me.user) {
-        router.push("/login");
+        const next = `/join?${params.toString()}`;
+        router.push(`/login?next=${encodeURIComponent(next)}`);
         return;
       }
       if (mode === "live") {

@@ -32,20 +32,24 @@ export default function HomePage() {
   return (
     <HomeShell name={user.name}>
       <h1 className="text-2xl font-black">Classes</h1>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {classes.map((c) => (
-          <Link key={c.id} href={`/c/${c.id}`} className="block overflow-hidden rounded-[12px] border border-line bg-surface">
-            <div className="h-16 px-4 py-3 text-white" style={{ background: classHue(c.id) }}>
-              <p className="truncate font-black">{c.name}</p>
-              <p className="text-xs opacity-90">{c.code}</p>
-            </div>
-          </Link>
-        ))}
-      </div>
+      {classes.length === 0 ? (
+        <p className="mt-2 text-muted">{user.role === "teacher" ? "Create your first class." : "Join with the code on the board."}</p>
+      ) : (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {classes.map((c) => (
+            <Link key={c.id} href={`/c/${c.id}`} className="block overflow-hidden rounded-[12px] border border-line bg-surface">
+              <div className="h-16 px-4 py-3 text-white" style={{ background: classHue(c.id) }}>
+                <p className="truncate font-black">{c.name}</p>
+                <p className="text-xs opacity-90">{c.code}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
       {user.role === "teacher" ? (
         <div className="mt-6 flex flex-col gap-3">
-          <Field label="New class" htmlFor="cname">
-            <Input id="cname" value={name} onChange={(e) => setName(e.target.value)} />
+          <Field label="Class name" htmlFor="cname">
+            <Input id="cname" placeholder="STEM 11 Biology" value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
           {msg ? <p role="alert" className="text-sm font-bold text-danger">{msg}</p> : null}
           <Button
@@ -58,7 +62,7 @@ export default function HomePage() {
               }
             }}
           >
-            Create
+            Create class
           </Button>
         </div>
       ) : (
